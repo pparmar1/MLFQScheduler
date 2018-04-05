@@ -15,7 +15,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
-int RUNNING_THRESHOLD = 2;
+int RUNNING_THRESHOLD = 20;
 int WAITING_THRESHOLD = 4;
 
 int sched_trace_enabled = 1; // for CS550 CPU/process project
@@ -166,6 +166,7 @@ fork(void)
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
+  np->running_tick=0;
   release(&ptable.lock);
   
   return pid;
@@ -272,32 +273,40 @@ scheduler(void)
 {
   struct proc *p;
   int ran = 0; // CS550: to solve the 100%-CPU-utilization-when-idling problem
-
+   
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
+   
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     ran = 0;
+    
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      
       if(p->state != RUNNABLE)
         continue;
-
-      ran = 1;
-      
+      //cprintf("pid = %d\n",p->pid); 
+      if(p->running_tick<RUNNING_THRESHOLD || p->pid<=2){
+      	ran = 1; 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
-
+      	proc = p;
+      	p->running_tick++;
+      	cprintf("Runningticks: %d\n",p->running_tick);
+      	switchuvm(p);
+      	p->state = RUNNING;
+      	swtch(&cpu->scheduler, proc->context);
+      	switchkvm();
+      
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      proc = 0;
+      	proc = 0;
+      //p->running_tick=0;
+      }else{
+	
+    }
     }
     release(&ptable.lock);
 
