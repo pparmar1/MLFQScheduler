@@ -15,8 +15,10 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int RUNNING_THRESHOLD = 2;
+int WAITING_THRESHOLD = 4;
 
-int sched_trace_enabled = 0; // for CS550 CPU/process project
+int sched_trace_enabled = 1; // for CS550 CPU/process project
 
 extern void forkret(void);
 extern void trapret(void);
@@ -480,4 +482,35 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int setrunningticks(int time_allotment){
+	if(time_allotment>0){
+		RUNNING_THRESHOLD = time_allotment;
+		cprintf("Running ticks: %d\n", RUNNING_THRESHOLD);
+		return 0;
+	}
+	else
+		return 1;
+
+}
+
+int setwaitingticks(int waiting_thres){
+	if(waiting_thres > 0){
+		WAITING_THRESHOLD = waiting_thres;
+		cprintf("Waiting ticks: %d\n", WAITING_THRESHOLD);
+		return 0;
+	}
+	else
+		return 1;
+}
+
+int setpriority(int pid, int priority){
+	if(priority > 0){
+		cprintf("priority \n"); 
+		return 0;
+	}
+	else 
+		return 1;
+
 }

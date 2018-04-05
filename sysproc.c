@@ -7,6 +7,10 @@
 #include "mmu.h"
 #include "proc.h"
 
+extern int setrunningticks(int time_allotment);
+extern int setwaitingticks(int waiting_thres);
+extern int setpriority(int pid, int priority);
+
 int
 sys_fork(void)
 {
@@ -108,3 +112,20 @@ int sys_shutdown(void)
 
   return 0;
 }
+
+int sys_setrunningticks(int time_allotment){
+	argint(0, &time_allotment);
+	return setrunningticks(time_allotment);
+}
+
+int sys_setwaitingticks(int waiting_thres){
+	argint(0, &waiting_thres);
+	return setwaitingticks(waiting_thres);
+}
+
+int  sys_setpriority(int pid, int priority){
+	argint(0, &pid);
+	argint(1, &priority);
+	return setpriority(pid, priority);
+}
+
