@@ -13,7 +13,7 @@ struct {
 } ptable;
 
 static struct proc *initproc;
-
+int sched_policy=1;
 int nextpid = 1;
 int RUNNING_THRESHOLD = 2;
 int WAITING_THRESHOLD = 4;
@@ -266,7 +266,7 @@ wait(void) {
 //      via swtch back to the scheduler.
 
 void
-scheduler(void) {
+MLFQscheduler(void) {
     struct proc *p;
     struct proc *q, *s;
     int check_priority = 0;
@@ -287,37 +287,31 @@ scheduler(void) {
                     continue;
                 if ((p->running_tick < RUNNING_THRESHOLD && p->queue == 0) || (p->pid <= 2 && p->queue == 0) ||
                     (p->priority == 1 && p->queue == 0)) {
-                    //cprintf("in if\n");
                     ran = 1;
                     // Switch to chosen process.  It is the process's job
                     // to release ptable.lock and then reacquire it
                     // before jumping back to us.
                     proc = p;
                     p->running_tick++;
-                    //cprintf("Runningticks: %d\n",p->running_tick);
                     switchuvm(p);
                     p->state = RUNNING;
                     swtch(&cpu->scheduler, proc->context);
                     switchkvm();
-                    //cprintf("hi");
                     // Process is done running for now.
                     // It should have changed its p->state before coming back.
                     proc = 0;
-                } else if(p->queue == 0) {
-                    //cprintf("in else for pid %d\n",p->pid);
-
+                } else if(p->queue == 0) {//demotion logic
                     p->queue = 1;
                     p->waiting_tick = 0;
                     p->running_tick = 0;
                 }
-                //}
-                //cprintf("outside else\n");
+		//increment waiting ticks for processes in queue 1
                 for (q = ptable.proc; q < &ptable.proc[NPROC]; q++) {
                     if (q->queue == 1) {
                         q->waiting_tick++;
-                        //cprintf("yess waiting tick %d\n",q->waiting_tick);
                     }
                 }
+		//promotion logic
                 if (p->waiting_tick > WAITING_THRESHOLD) {
                     p->queue = 0;
                     p->waiting_tick = 0;
@@ -326,40 +320,29 @@ scheduler(void) {
             }//for close
             release(&ptable.lock);
             if (ran == 0) {
-                //cprintf("ran is 0");
-                //halt();
                 break;
             }
         }//inner infinite loop close
-        //cprintf("Queue1\n");
+
+	//code for Queue 1
         acquire(&ptable.lock);
-        //cprintf("lock acquired");
         ran = 0;
         for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            //cprintf("run for processes");
             if (p->queue == 1) {
-               // cprintf("process in queue 1 found\n");
                 for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
 			if (p->state != RUNNABLE)
                     continue;
-                   // cprintf("pid %d, waiting tick %d, queue %d\n, priority %d",p->pid,p->waiting_tick, p->queue,p->priority);
+        	//check for process with highest priority	
                     if (p->waiting_tick >= check_priority && p->queue == 1) {
-                        //cprintf("check priority %d\n",check_priority);
                         check_priority = p->waiting_tick;
-                        //cprintf("check priority after it is changed %d\n",check_priority);
-                        //cprintf("pid %d",p->pid);
                         s = p;
-                        //cprintf("waiting tick:%d\n",s->waiting_tick);
                     }//if close
                 }//for close(priority check)
-                //cprintf("run process in queue1\n");
+		//run process with highest priority
                 if (s->queue == 1 && s->priority == 0) {
-                    //cprintf("hello");
                     ran = 1;
                     proc = s;
                     s->running_tick++;
-                    //cprintf("Runningticks: %d\n",s->running_tick);
-                    //cprintf("pid of the process %d\n");
                     switchuvm(s);
                     s->state = RUNNING;
                     swtch(&cpu->scheduler, proc->context);
@@ -371,23 +354,64 @@ scheduler(void) {
                 }
             }
         }
+	//increment waiting tick for other processes
         for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
             if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
-                //cprintf("increment waiting tick of other process in queue 1\n");
                 p->waiting_tick++;
             }
         }
-        //cprintf("release lock");
-
 
         release(&ptable.lock);
         if (ran == 0) {
             halt();
         }
-        //cprintf("run for other process");
     }//outer infinite for
 }
 
+
+void
+scheduler(void)
+{
+  if(sched_policy == 1)
+	MLFQscheduler();
+  
+  struct proc *p;
+  int ran = 0; // CS550: to solve the 100%-CPU-utilization-when-idling problem
+
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    ran = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      ran = 1;
+      
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      swtch(&cpu->scheduler, proc->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      proc = 0;
+    }
+    release(&ptable.lock);
+
+    if (ran == 0){
+        halt();
+    }
+  }
+
+}
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state.
 void
