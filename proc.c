@@ -269,7 +269,7 @@ void
 MLFQscheduler(void) {
     struct proc *p;
     struct proc *q, *s;
-    int check_priority = 0;
+    int check_priority = -1;
     int ran = 0; // CS550: to solve the 100%-CPU-utilization-when-idling problem
 
     for (;;) {
@@ -328,21 +328,22 @@ MLFQscheduler(void) {
         acquire(&ptable.lock);
         ran = 0;
         for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            if (p->queue == 1) {
-                for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-			if (p->state != RUNNABLE)
-                    continue;
+           // if (p->queue == 1 && p->state==RUNNABLE) {
+               // for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+		
         	//check for process with highest priority	
-                    if (p->waiting_tick >= check_priority && p->queue == 1) {
-                        check_priority = p->waiting_tick;
+                    if (p->waiting_tick >= check_priority && p->queue == 1 && p->state==RUNNABLE) {
+                        check_priority = p->waiting_tick;	
+			ran=1;
                         s = p;
                     }//if close
-                }//for close(priority check)
+                //}//for close(priority check)
 		//run process with highest priority
-                if (s->queue == 1 && s->priority == 0) {
-                    ran = 1;
+                
+        }
+	if (ran==1) {
                     proc = s;
-                    s->running_tick++;
+                    //s->running_tick++;
                     switchuvm(s);
                     s->state = RUNNING;
                     swtch(&cpu->scheduler, proc->context);
@@ -351,16 +352,15 @@ MLFQscheduler(void) {
                     // Process is done running for now.
                     // It should have changed its p->state before coming back.
                     proc = 0;
-                }
-            }
-        }
-	//increment waiting tick for other processes
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
-                p->waiting_tick++;
-            }
-        }
+			 for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+				    if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
+					p->waiting_tick++;
+				    }
+				}
 
+                }
+	//increment waiting tick for other processes
+       
         release(&ptable.lock);
         if (ran == 0) {
             halt();
