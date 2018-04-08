@@ -267,105 +267,105 @@ wait(void) {
 
 void
 MLFQscheduler(void) {
-    struct proc *p;
-    struct proc *q, *s;
-    int check_priority = -1;
-    int ran = 0; // CS550: to solve the 100%-CPU-utilization-when-idling problem
+	struct proc *p;
+    	struct proc *q, *s;
+   	int check_priority = -1;
+    	int ran = 0; // CS550: to solve the 100%-CPU-utilization-when-idling problem
 
-    for (;;) {
-        for (;;) {
-            // Enable interrupts on this processor.
-            sti();
+    	for (;;) {
+        	for (;;) {
+            	// Enable interrupts on this processor.
+            		sti();
 
-            // Loop over process table looking for process to run.
-            acquire(&ptable.lock);
-            ran = 0;
+		    	// Loop over process table looking for process to run.
+		    	acquire(&ptable.lock);
+		    	ran = 0;
 
-            for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+		    	for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
 
-                if (p->state != RUNNABLE)
-                    continue;
-                if ((p->running_tick < RUNNING_THRESHOLD && p->queue == 0) || (p->pid <= 2 && p->queue == 0) ||
-                    (p->priority == 1 && p->queue == 0)) {
-                    ran = 1;
-                    // Switch to chosen process.  It is the process's job
-                    // to release ptable.lock and then reacquire it
-                    // before jumping back to us.
-                    proc = p;
-                    p->running_tick++;
-                    switchuvm(p);
-                    p->state = RUNNING;
-                    swtch(&cpu->scheduler, proc->context);
-                    switchkvm();
-                    // Process is done running for now.
-                    // It should have changed its p->state before coming back.
-                    proc = 0;
-                } else if(p->queue == 0) {//demotion logic
-                    p->queue = 1;
-                    p->waiting_tick = 0;
-                    p->running_tick = 0;
-                }
-		//increment waiting ticks for processes in queue 1
-                for (q = ptable.proc; q < &ptable.proc[NPROC]; q++) {
-                    if (q->queue == 1) {
-                        q->waiting_tick++;
-                    }
-                }
-		//promotion logic
-                if (p->waiting_tick > WAITING_THRESHOLD) {
-                    p->queue = 0;
-                    p->waiting_tick = 0;
-                    p->running_tick = 0;
-                }
-            }//for close
-            release(&ptable.lock);
-            if (ran == 0) {
-                break;
-            }
-        }//inner infinite loop close
-
-	//code for Queue 1
-        acquire(&ptable.lock);
-        ran = 0;
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-           // if (p->queue == 1 && p->state==RUNNABLE) {
-               // for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-		
-        	//check for process with highest priority	
-                    if (p->waiting_tick >= check_priority && p->queue == 1 && p->state==RUNNABLE) {
-                        check_priority = p->waiting_tick;	
-			ran=1;
-                        s = p;
-                    }//if close
-                //}//for close(priority check)
-		//run process with highest priority
-                
-        }
-	if (ran==1) {
-                    proc = s;
-                    //s->running_tick++;
-                    switchuvm(s);
-                    s->state = RUNNING;
-                    swtch(&cpu->scheduler, proc->context);
-                    switchkvm();
-
-                    // Process is done running for now.
-                    // It should have changed its p->state before coming back.
-                    proc = 0;
-			 for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-				    if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
-					p->waiting_tick++;
-				    }
+		        	if (p->state != RUNNABLE)
+		         		continue;
+		        	if ((p->running_tick < RUNNING_THRESHOLD && p->queue == 0) || (p->pid <= 2 && p->queue == 0) ||
+		            	(p->priority == 1 && p->queue == 0)) {
+		                	ran = 1;
+				        // Switch to chosen process.  It is the process's job
+				        // to release ptable.lock and then reacquire it
+				        // before jumping back to us.
+				        proc = p;
+				    	p->running_tick++;
+				    	switchuvm(p);
+				    	p->state = RUNNING;
+				    	swtch(&cpu->scheduler, proc->context);
+				    	switchkvm();
+				    	// Process is done running for now.
+				    	// It should have changed its p->state before coming back.
+				   	proc = 0;
+				} else if(p->queue == 0) {//demotion logic
+				    	p->queue = 1;
+				    	p->waiting_tick = 0;
+				    	p->running_tick = 0;
 				}
+				//increment waiting ticks for processes in queue 1
+				for (q = ptable.proc; q < &ptable.proc[NPROC]; q++) {
+				    	if (q->queue == 1 && q->pid!=0) {
+				        	q->waiting_tick++;
+				    	}
+				}
+				//promotion logic
+				if (p->waiting_tick > WAITING_THRESHOLD) {
+				    p->queue = 0;
+				    p->waiting_tick = 0;
+				    p->running_tick = 0;
+				}
+			}//for close
+			release(&ptable.lock);
+			if (ran == 0) {
+				break;
+			}
+		}//inner infinite loop close
 
-                }
-	//increment waiting tick for other processes
-       
-        release(&ptable.lock);
-        if (ran == 0) {
-            halt();
-        }
-    }//outer infinite for
+		//code for Queue 1
+		acquire(&ptable.lock);
+		ran = 0;
+		for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+		   // if (p->queue == 1 && p->state==RUNNABLE) {
+		       // for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+		
+			//check for process with highest priority	
+		            if (p->waiting_tick >= check_priority && p->queue == 1 && p->state==RUNNABLE) {
+		                check_priority = p->waiting_tick;	
+				ran=1;
+		                s = p;
+		            }//if close
+		        //}//for close(priority check)
+			//run process with highest priority
+		        
+		}
+		if (ran==1) {
+		            proc = s;
+		            //s->running_tick++;
+		            switchuvm(s);
+		            s->state = RUNNING;
+		            swtch(&cpu->scheduler, proc->context);
+		            switchkvm();
+
+		            // Process is done running for now.
+		            // It should have changed its p->state before coming back.
+		            proc = 0;
+				 for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+					    if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
+						p->waiting_tick++;
+					    }
+					}
+
+		        }
+		//increment waiting tick for other processes
+	       
+		release(&ptable.lock);
+		if (ran == 0) {
+		    halt();
+		}
+	    }//outer infinite for
 }
 
 
