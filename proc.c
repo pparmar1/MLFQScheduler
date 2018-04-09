@@ -349,8 +349,7 @@ MLFQscheduler(void) {
 		            swtch(&cpu->scheduler, proc->context);
 		            switchkvm();
 
-		            // Process is done running for now.
-		            // It should have changed its p->state before coming back.
+		           //increment waiting tick for other processes
 		            proc = 0;
 				 for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
 					    if (p->queue == 1 && p->pid != s->pid && p->priority == 0) {
@@ -359,7 +358,6 @@ MLFQscheduler(void) {
 					}
 
 		        }
-		//increment waiting tick for other processes
 	       
 		release(&ptable.lock);
 		if (ran == 0) {
